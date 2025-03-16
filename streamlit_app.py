@@ -113,4 +113,3 @@ if st.button("Start"):
         st.success(f"Successfully saved {len(all_posts_data)} new posts to Google Sheets.")
     else:
         st.warning("No new posts to save.")
-
