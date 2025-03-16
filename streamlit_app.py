@@ -1,4 +1,4 @@
-#v1
+edit this code #v1
 
 import streamlit as st
 import praw
@@ -106,3 +106,10 @@ if st.button("Start"):
 
     if all_posts_data:
 
+
+
+    
+        sheet.append_rows(all_posts_data, value_input_option="RAW")
+        st.success(f"Successfully saved {len(all_posts_data)} new posts to Google Sheets.")
+    else:
+        st.warning("No new posts to save.")
