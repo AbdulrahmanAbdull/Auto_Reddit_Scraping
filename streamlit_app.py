@@ -153,11 +153,11 @@ if st.button("Save Input"):
     st.session_state['saved_keywords'] = keyword_input
     st.success("Input saved.")
 
-# Reset inputs and refresh page
+# Reset inputs
 if st.button("Reset"):
     st.session_state['saved_url'] = ""
     st.session_state['saved_keywords'] = ""
-    st.experimental_rerun()
+    st.success("Input reset.")
 
 # Initialize Reddit API
 reddit = praw.Reddit(
@@ -185,30 +185,35 @@ existing_records = sheet.get_all_values()
 existing_links = {row[3] for row in existing_records[1:]}  # Assuming permalink is in the 4th column
 
 # Scrape Reddit posts
-for url in subreddit_urls:
-    subreddit_name = url.replace("https://www.reddit.com/r/", "").strip('/')
-    try:
-        subreddit = reddit.subreddit(subreddit_name)
-        for post in subreddit.new(limit=None):
-            matched_keywords = [kw for pattern, kw in zip(keyword_patterns, keywords) if pattern.search(post.title)]
-            post_permalink = f"https://www.reddit.com{post.permalink}"
-            if post_permalink not in existing_links:
-                post_info = [
-                    subreddit_name,
-                    url,
-                    post.title,
-                    post_permalink,
-                    post.score,
-                    datetime.datetime.fromtimestamp(post.created_utc).strftime('%Y-%m-%d %H:%M:%S'),
-                    ", ".join(matched_keywords)
-                ]
-                all_posts_data.append(post_info)
-    except Exception:
-        pass
+def fetch_reddit_data():
+    for url in subreddit_urls:
+        subreddit_name = url.replace("https://www.reddit.com/r/", "").strip('/')
+        try:
+            subreddit = reddit.subreddit(subreddit_name)
+            for post in subreddit.new(limit=None):
+                matched_keywords = [kw for pattern, kw in zip(keyword_patterns, keywords) if pattern.search(post.title)]
+                post_permalink = f"https://www.reddit.com{post.permalink}"
+                if post_permalink not in existing_links:
+                    post_info = [
+                        subreddit_name,
+                        url,
+                        post.title,
+                        post_permalink,
+                        post.score,
+                        datetime.datetime.fromtimestamp(post.created_utc).strftime('%Y-%m-%d %H:%M:%S'),
+                        ", ".join(matched_keywords)
+                    ]
+                    all_posts_data.append(post_info)
+        except Exception:
+            pass
 
-# Append new data to Google Sheets
-if all_posts_data:
-    sheet.append_rows(all_posts_data, value_input_option="RAW")
-    st.success(f"Successfully saved {len(all_posts_data)} new posts to Google Sheets.")
-else:
-    st.warning("No new posts to save.")
+    # Append new data to Google Sheets
+    if all_posts_data:
+        sheet.append_rows(all_posts_data, value_input_option="RAW")
+        st.success(f"Successfully saved {len(all_posts_data)} new posts to Google Sheets.")
+    else:
+        st.warning("No new posts to save.")
+
+# Run the function automatically and with the Start button
+if st.button("Start") or True:
+    fetch_reddit_data()
