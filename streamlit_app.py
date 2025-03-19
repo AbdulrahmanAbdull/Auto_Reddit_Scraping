@@ -478,13 +478,14 @@ if st.button("Start"):
     client = gspread.authorize(creds)
     sheet = client.open("redditData").sheet1
 
-    # Ensure headers exist
-    headers = ["Subreddit", "Subreddit URL", "Title", "Post URL", "Score", "Date", "Matched Keywords"]
+    # Ensure headers exist in the first row
+    headers = ["Subreddit Name", "Subreddit Link", "Post Title", "Post Link", "Post Upvotes", "Post Date", "Triggering Keywords"]
     existing_records = sheet.get_all_values()
-    if not existing_records:
-        sheet.append_row(headers)
+    if not existing_records or existing_records[0] != headers:
+        sheet.insert_row(headers, index=1)
+        existing_records = sheet.get_all_values()  # Refresh data after inserting headers
 
-    existing_links = {row[3] for row in existing_records[1:]}  # Assuming permalink is in the 4th column
+    existing_links = {row[3] for row in existing_records[1:]} if len(existing_records) > 1 else set()  # Assuming permalink is in the 4th column
 
     # Process input
     subreddit_urls = [link.strip() for link in url_input.splitlines() if link.strip()]
