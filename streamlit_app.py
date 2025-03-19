@@ -341,8 +341,6 @@ import praw
 import gspread
 import datetime
 import re
-import time
-import threading
 from oauth2client.service_account import ServiceAccountCredentials
 
 # Reddit API credentials
@@ -354,94 +352,96 @@ REDDIT_USER_AGENT = "scraping"
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 CREDS_FILE = st.secrets["google_creds_file"]
 
-def fetch_and_store_reddit_data():
-    while True:
-        # Initialize Reddit API
-        reddit = praw.Reddit(
-            client_id=REDDIT_CLIENT_ID,
-            client_secret=REDDIT_CLIENT_SECRET,
-            user_agent=REDDIT_USER_AGENT,
-        )
-
-        # Google Sheets connection
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["google_creds_file"], SCOPE)
-        client = gspread.authorize(creds)
-        sheet = client.open("redditData").sheet1
-
-        # Ensure headers exist in the first row
-        headers = ["Subreddit Name", "Subreddit Link", "Post Title", "Post Link", "Post Upvotes", "Post Date", "Triggering Keywords"]
-        existing_records = sheet.get_all_values()
-        if not existing_records or existing_records[0] != headers:
-            sheet.insert_row(headers, index=1)
-            existing_records = sheet.get_all_values()  # Refresh data after inserting headers
-
-        existing_links = {row[3] for row in existing_records[1:]} if len(existing_records) > 1 else set()  # Assuming permalink is in the 4th column
-
-        # Process input
-        subreddit_urls = [link.strip() for link in st.session_state.get('saved_url', '').splitlines() if link.strip()]
-        trigger_keywords = [kw.strip().lower() for kw in st.session_state.get('saved_trigger_keywords', '').split(',') if kw.strip()]
-
-        # Generate regex patterns for trigger keywords
-        trigger_patterns = [re.compile(rf"\b{re.escape(kw)}(s|es|ks|ks'|es'|s'|ing|ed)?\b", re.IGNORECASE) for kw in trigger_keywords]
-
-        all_posts_data = []
-
-        for url in subreddit_urls:
-            subreddit_name = url.replace("https://www.reddit.com/r/", "").strip('/')
-            try:
-                subreddit = reddit.subreddit(subreddit_name)
-
-                for post in subreddit.new(limit=None):
-                    matched_triggers = [kw for pattern, kw in zip(trigger_patterns, trigger_keywords) if pattern.search(post.title)]
-                    if matched_triggers:
-                        post_permalink = f"https://www.reddit.com{post.permalink}"
-                        
-                        if post_permalink not in existing_links:
-                            post_info = [
-                                subreddit_name,
-                                url,
-                                post.title,
-                                post_permalink,
-                                post.score,
-                                datetime.datetime.fromtimestamp(post.created_utc).strftime('%Y-%m-%d %H:%M:%S'),
-                                ", ".join(matched_triggers)
-                            ]
-                            all_posts_data.append(post_info)
-
-            except Exception:
-                pass
-
-        if all_posts_data:
-            sheet.append_rows(all_posts_data, value_input_option="RAW")
-            st.success(f"Successfully saved {len(all_posts_data)} new posts to Google Sheets.")
-        else:
-            st.warning("No new matching posts to save.")
-
-        time.sleep(60)  # Wait for 1 minute before the next execution
-
-# Start the background process
-threading.Thread(target=fetch_and_store_reddit_data, daemon=True).start()
-
 # Streamlit UI
 st.title("Reddit Scraper")
 
 # Load saved input
 if 'saved_url' not in st.session_state:
     st.session_state['saved_url'] = ""
+if 'saved_keywords' not in st.session_state:
+    st.session_state['saved_keywords'] = ""
 if 'saved_trigger_keywords' not in st.session_state:
     st.session_state['saved_trigger_keywords'] = ""
 
 # Input fields
 url_input = st.text_area("Enter subreddit links (one per line)", value=st.session_state['saved_url'])
+keyword_input = st.text_area("Enter subreddit-name (comma-separated)", value=st.session_state['saved_keywords'])
 trigger_keyword_input = st.text_area("Enter keywords triggered in post titles (comma-separated)", value=st.session_state['saved_trigger_keywords'])
 
 # Buttons for actions
 if st.button("Save Input"):
     st.session_state['saved_url'] = url_input
+    st.session_state['saved_keywords'] = keyword_input
     st.session_state['saved_trigger_keywords'] = trigger_keyword_input
     st.success("Input saved.")
 
 if st.button("Reset"):
     st.session_state['saved_url'] = ""
+    st.session_state['saved_keywords'] = ""
     st.session_state['saved_trigger_keywords'] = ""
     st.success("Input reset.")
+
+if st.button("Start"):
+    # Initialize Reddit API
+    reddit = praw.Reddit(
+        client_id=REDDIT_CLIENT_ID,
+        client_secret=REDDIT_CLIENT_SECRET,
+        user_agent=REDDIT_USER_AGENT,
+    )
+
+    # Google Sheets connection
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["google_creds_file"], SCOPE)
+    client = gspread.authorize(creds)
+    sheet = client.open("redditData").sheet1
+
+    # Ensure headers exist in the first row
+    headers = ["Subreddit Name", "Subreddit Link", "Post Title", "Post Link", "Post Upvotes", "Post Date", "Triggering Keywords"]
+    existing_records = sheet.get_all_values()
+    if not existing_records or existing_records[0] != headers:
+        sheet.insert_row(headers, index=1)
+        existing_records = sheet.get_all_values()  # Refresh data after inserting headers
+
+    existing_links = {row[3] for row in existing_records[1:]} if len(existing_records) > 1 else set()  # Assuming permalink is in the 4th column
+
+    # Process input
+    subreddit_urls = [link.strip() for link in url_input.splitlines() if link.strip()]
+    subreddit_keywords = [kw.strip().lower() for kw in keyword_input.split(',') if kw.strip()]
+    trigger_keywords = [kw.strip().lower() for kw in trigger_keyword_input.split(',') if kw.strip()]
+
+    all_urls = subreddit_urls + [f"https://www.reddit.com/r/{kw}" for kw in subreddit_keywords]
+
+    # Generate regex patterns for trigger keywords
+    trigger_patterns = [re.compile(rf"\b{re.escape(kw)}(s|es|ks|ks'|es'|s'|ing|ed)?\b", re.IGNORECASE) for kw in trigger_keywords]
+
+    all_posts_data = []
+
+    for url in all_urls:
+        subreddit_name = url.replace("https://www.reddit.com/r/", "").strip('/')
+        try:
+            subreddit = reddit.subreddit(subreddit_name)
+
+            for post in subreddit.new(limit=None):
+                matched_triggers = [kw for pattern, kw in zip(trigger_patterns, trigger_keywords) if pattern.search(post.title)]
+                if matched_triggers:  # Only save posts that contain a trigger keyword
+                    triggering_keywords = ", ".join(matched_triggers)
+                    post_permalink = f"https://www.reddit.com{post.permalink}"
+
+                    if post_permalink not in existing_links:
+                        post_info = [
+                            subreddit_name,
+                            url,
+                            post.title,
+                            post_permalink,
+                            post.score,
+                            datetime.datetime.fromtimestamp(post.created_utc).strftime('%Y-%m-%d %H:%M:%S'),
+                            triggering_keywords
+                        ]
+                        all_posts_data.append(post_info)
+        except Exception:
+            pass
+
+    if all_posts_data:
+        sheet.append_rows(all_posts_data, value_input_option="RAW")
+        st.success(f"Successfully saved {len(all_posts_data)} new posts to Google Sheets.")
+    else:
+        st.warning("No matching posts found.")
