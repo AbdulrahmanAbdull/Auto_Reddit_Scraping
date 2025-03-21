@@ -831,7 +831,15 @@ negative_keyword_input = st.text_area("Enter negative keywords (comma-separated)
 existing_folders = sorted(os.listdir(FOLDER_PATH))
 st.sidebar.header("Folders")
 for folder in existing_folders:
-    st.sidebar.write(folder)
+    if st.sidebar.button(folder):
+        folder_path = os.path.join(FOLDER_PATH, folder)
+        with open(os.path.join(folder_path, "keywords.txt"), "r") as f:
+            st.session_state['saved_keywords'] = f.read()
+        with open(os.path.join(folder_path, "trigger_keywords.txt"), "r") as f:
+            st.session_state['saved_trigger_keywords'] = f.read()
+        with open(os.path.join(folder_path, "negative_keywords.txt"), "r") as f:
+            st.session_state['saved_negative_keywords'] = f.read()
+        st.experimental_rerun()
 
 # Buttons for actions
 if st.button("Save Input"):
@@ -845,12 +853,14 @@ if st.button("Save Input"):
     with open(os.path.join(folder_path, "negative_keywords.txt"), "w") as f:
         f.write(negative_keyword_input)
     st.success(f"Setup saved as {folder_name}")
+    st.experimental_rerun()
 
 if st.button("Reset"):
     st.session_state['saved_keywords'] = ""
     st.session_state['saved_trigger_keywords'] = ""
     st.session_state['saved_negative_keywords'] = ""
     st.success("Input reset.")
+    st.experimental_rerun()
 
 if st.button("Start"):
     # Initialize Reddit API
@@ -919,4 +929,3 @@ if st.button("Start"):
 
         except Exception as e:
             st.error(f"Error fetching subreddit {subreddit_name}: {e}")
-
