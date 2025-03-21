@@ -445,8 +445,8 @@ if st.button("Start"):
         st.success(f"Successfully saved {len(all_posts_data)} new posts to Google Sheets.")
     else:
         st.warning("No matching posts found.")
-'''
 
+# negativekeyword filter
 
 import streamlit as st
 import praw
@@ -561,3 +561,115 @@ if st.button("Start"):
         st.success(f"Successfully saved {len(all_posts_data)} new posts to Google Sheets.")
     else:
         st.warning("No matching posts found.")
+
+    '''
+#with folder structure 
+import streamlit as st
+import praw
+import gspread
+import datetime
+import re
+from oauth2client.service_account import ServiceAccountCredentials
+
+# Reddit API credentials
+REDDIT_CLIENT_ID = "lWFWfRPV8_EHqjRpAdzclA"
+REDDIT_CLIENT_SECRET = "TUfF3yHH80wYOSCvtXajFQ9QkblXmQ"
+REDDIT_USER_AGENT = "scraping"
+
+# Google Sheets authentication using Streamlit secrets
+SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+CREDS_FILE = st.secrets["google_creds_file"]
+
+# Initialize session state for folders
+if "folders" not in st.session_state:
+    st.session_state["folders"] = {}
+if "current_folder" not in st.session_state:
+    st.session_state["current_folder"] = ""
+
+# Sidebar for folders
+st.sidebar.header("Folders")
+for folder_name in st.session_state["folders"]:
+    if st.sidebar.button(folder_name):
+        st.session_state["current_folder"] = folder_name
+
+# Main UI
+st.title("Reddit Scraper")
+
+# Load saved input if a folder is selected
+selected_folder = st.session_state["current_folder"]
+if selected_folder:
+    saved_data = st.session_state["folders"].get(selected_folder, {})
+else:
+    saved_data = {}
+
+# Input fields
+url_input = st.text_area("Enter subreddit links (one per line)", value=saved_data.get("urls", ""))
+keyword_input = st.text_area("Enter subreddit-name (comma-separated)", value=saved_data.get("keywords", ""))
+trigger_keyword_input = st.text_area("Enter keywords triggered in post titles (comma-separated)", value=saved_data.get("trigger_keywords", ""))
+negative_keyword_input = st.text_area("Enter negative keywords (comma-separated)", value=saved_data.get("negative_keywords", ""))
+
+# Save input as a new folder
+if st.button("Save Input"):
+    folder_name = f"Scrape {len(st.session_state['folders']) + 1}"
+    st.session_state["folders"][folder_name] = {
+        "urls": url_input,
+        "keywords": keyword_input,
+        "trigger_keywords": trigger_keyword_input,
+        "negative_keywords": negative_keyword_input
+    }
+    st.session_state["current_folder"] = folder_name
+    st.success(f"Saved as {folder_name}")
+
+# Reset input fields
+if st.button("Reset"):
+    st.session_state["current_folder"] = ""
+    st.success("Input reset.")
+
+# Start processing
+if st.button("Start") and selected_folder:
+    reddit = praw.Reddit(
+        client_id=REDDIT_CLIENT_ID,
+        client_secret=REDDIT_CLIENT_SECRET,
+        user_agent=REDDIT_USER_AGENT,
+    )
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["google_creds_file"], SCOPE)
+    client = gspread.authorize(creds)
+    sheet = client.open("redditData").sheet1
+
+    headers = ["Subreddit Name", "Subreddit Link", "Post Title", "Post Link", "Post Upvotes", "Post Date", "Triggering Keywords"]
+    existing_records = sheet.get_all_values()
+    if not existing_records or existing_records[0] != headers:
+        sheet.insert_row(headers, index=1)
+
+    subreddit_keywords = [kw.strip().lower() for kw in keyword_input.split(',') if kw.strip()]
+    trigger_keywords = [kw.strip().lower() for kw in trigger_keyword_input.split(',') if kw.strip()]
+    negative_keywords = [kw.strip().lower() for kw in negative_keyword_input.split(',') if kw.strip()]
+    trigger_patterns = [re.compile(rf"\b{re.escape(kw)}(s|es|ing|ed)?\b", re.IGNORECASE) for kw in trigger_keywords]
+    negative_patterns = [re.compile(rf"\b{re.escape(kw)}(s|es|ing|ed)?\b", re.IGNORECASE) for kw in negative_keywords]
+
+    all_posts_data = []
+    for subreddit_name in subreddit_keywords:
+        try:
+            subreddit = reddit.subreddit(subreddit_name)
+            for post in subreddit.new(limit=None):
+                matched_triggers = [kw for pattern, kw in zip(trigger_patterns, trigger_keywords) if pattern.search(post.title)]
+                matched_negatives = [kw for pattern, kw in zip(negative_patterns, negative_keywords) if pattern.search(post.title)]
+                if matched_triggers and not matched_negatives:
+                    all_posts_data.append([
+                        subreddit_name,
+                        f"https://www.reddit.com/r/{subreddit_name}",
+                        post.title,
+                        f"https://www.reddit.com{post.permalink}",
+                        post.score,
+                        datetime.datetime.fromtimestamp(post.created_utc).strftime('%Y-%m-%d %H:%M:%S'),
+                        ", ".join(matched_triggers)
+                    ])
+        except Exception:
+            pass
+
+    if all_posts_data:
+        sheet.append_rows(all_posts_data, value_input_option="RAW")
+        st.success(f"Saved {len(all_posts_data)} new posts.")
+    else:
+        st.warning("No matching posts found.")
+
