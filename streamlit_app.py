@@ -364,7 +364,7 @@ if 'saved_trigger_keywords' not in st.session_state:
     st.session_state['saved_trigger_keywords'] = ""
 
 # Input fields
-url_input = st.text_area("Enter subreddit links (one per line)", value=st.session_state['saved_url'])
+#url_input = st.text_area("Enter subreddit links (one per line)", value=st.session_state['saved_url'])
 keyword_input = st.text_area("Enter subreddit-name (comma-separated)", value=st.session_state['saved_keywords'])
 trigger_keyword_input = st.text_area("Enter keywords triggered in post titles (comma-separated)", value=st.session_state['saved_trigger_keywords'])
 
