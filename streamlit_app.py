@@ -137,7 +137,6 @@ import datetime
 import re
 import json
 from oauth2client.service_account import ServiceAccountCredentials
-from streamlit_extras.stylable_container import stylable_container
 
 # Reddit API credentials
 REDDIT_CLIENT_ID = "lWFWfRPV8_EHqjRpAdzclA"
@@ -178,6 +177,7 @@ for folder_name in list(st.session_state["folders"].keys()):
     with col3:
         if st.button("🗑️", key=f"delete_{folder_name}"):
             del st.session_state["folders"][folder_name]
+            st.session_state["current_folder"] = ""
             with open("folders.json", "w") as f:
                 json.dump(st.session_state["folders"], f)
             st.experimental_rerun()
@@ -204,14 +204,7 @@ if st.button("Save Input"):
         }
         st.success(f"Updated {selected_folder}")
     else:
-        folder_name = f"Scrape {len(st.session_state['folders']) + 1}"
-        st.session_state["folders"][folder_name] = {
-            "keywords": keyword_input,
-            "trigger_keywords": trigger_keyword_input,
-            "negative_keywords": negative_keyword_input
-        }
-        st.session_state["current_folder"] = folder_name
-        st.success(f"Saved as {folder_name}")
+        st.warning("Please select a folder to update.")
     with open("folders.json", "w") as f:
         json.dump(st.session_state["folders"], f)
 
