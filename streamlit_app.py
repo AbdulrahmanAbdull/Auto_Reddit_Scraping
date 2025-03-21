@@ -603,7 +603,7 @@ else:
     saved_data = {}
 
 # Input fields
-url_input = st.text_area("Enter subreddit links (one per line)", value=saved_data.get("urls", ""))
+#url_input = st.text_area("Enter subreddit links (one per line)", value=saved_data.get("urls", ""))
 keyword_input = st.text_area("Enter subreddit-name (comma-separated)", value=saved_data.get("keywords", ""))
 trigger_keyword_input = st.text_area("Enter keywords triggered in post titles (comma-separated)", value=saved_data.get("trigger_keywords", ""))
 negative_keyword_input = st.text_area("Enter negative keywords (comma-separated)", value=saved_data.get("negative_keywords", ""))
