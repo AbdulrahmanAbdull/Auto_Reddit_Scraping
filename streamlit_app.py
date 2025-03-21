@@ -1147,4 +1147,5 @@ if st.button("Start"):
 if st.session_state["scraping_running"]:
     while True:
         run_scraper()
-        time.sleep(180)  # Wait 3 minutes before running again
+        #time.sleep(180)  # Wait 3 minutes before running again
+        time.sleep(43200)  # Wait 12 hours before running again
