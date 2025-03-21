@@ -447,20 +447,11 @@ if "current_folder" not in st.session_state:
 # Sidebar for folder selection
 st.sidebar.header("Folders")
 for folder_name in list(st.session_state["folders"].keys()):
-    col1, col2, col3 = st.sidebar.columns([5, 1, 1])
+    col1, col2 = st.sidebar.columns([5, 1])
     with col1:
         if st.button(folder_name, key=f"folder_{folder_name}"):
             st.session_state["current_folder"] = folder_name
     with col2:
-        if st.button("✏️", key=f"edit_{folder_name}"):
-            new_name = st.text_input("Rename folder:", value=folder_name, key=f"rename_{folder_name}")
-            if st.button("Save Rename", key=f"save_rename_{folder_name}"):
-                st.session_state["folders"][new_name] = st.session_state["folders"].pop(folder_name)
-                st.session_state["current_folder"] = new_name
-                with open("folders.json", "w") as f:
-                    json.dump(st.session_state["folders"], f)
-                st.experimental_rerun()
-    with col3:
         if st.button("🗑️", key=f"delete_{folder_name}"):
             del st.session_state["folders"][folder_name]
             st.session_state["current_folder"] = ""
